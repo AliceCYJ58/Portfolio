@@ -1,13 +1,13 @@
 
-/*Homework #4
-Purpose:		Learn how to use PROC SQL to redo homework 2.
+/*
+Purpose:		Learn how to use PROC SQL.
 Author:			Alice (Yujia) Cai
 
 Date: 			Oct 24th.
 
 TO DO
 
-1.	Please sort FINALDATA by student ID and print the observations
+1.	Sort FINALDATA by student ID and print the observations
 2.	Create a Histogram (appropriately titled and labeled) of the 
     distribution of the Final Grade for the 100 students
 3.  Give students the mean, median, standard deviation, and quantiles of the final grade.
