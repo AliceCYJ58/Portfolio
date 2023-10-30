@@ -1,0 +1,88 @@
+---
+title: "CT Map"
+author: "Alice Cai"
+date: "2023-08-21"
+output: pdf_document
+---
+
+```{r}
+library(leaflet)
+library(dplyr)
+library(usmap)
+library(htmlwidgets)
+```
+
+```{r}
+Locations <- read.csv("~/Desktop/CT Hospice/Graph/Locations.csv")
+Locations <- na.omit(Locations)
+```
+
+```{r}
+#Edit data
+for (i in 1: nrow(Locations)){
+  if (Locations$Color[i] == "Green"){
+    Locations$Group[i] <-  "Contract Strong"
+  }
+  else if (Locations$Color[i] == "Yellow") {
+    Locations$Group[i] <- "Contract Soft"
+  } else {
+    Locations$Group[i] <- "No Contract"
+  }
+}
+```
+
+```{r}
+# Create a leaflet map centered on Connecticut
+ct_map <- leaflet() %>%
+  setView(lng = -72.7, lat = 41.5, zoom = 8)
+```
+
+```{r}
+# Add markers with different colors based on groups
+for (i in 1:nrow(Locations)) {
+  if (Locations$Group[i] == "Contract Strong") {
+    marker_color <- "green"
+  } else if (Locations$Group[i] == "Contract Soft") {
+    marker_color <- "yellow"
+  } else {
+    marker_color <- "red"
+  }
+  
+  ct_map <- ct_map %>%
+    addCircleMarkers(
+      lng = Locations$Longitude[i],
+      lat = Locations$Latitude[i],
+      color = marker_color,
+      radius = 10,
+      fillOpacity = 0.7,
+      popup = paste("Provider:", Locations$Name[i], "<br>Group:", Locations$Group[i])
+    )
+}
+```
+
+
+```{r}
+ct_map <- ct_map %>%
+  addTiles()
+```
+
+```{r}
+# Add color legend
+ct_map <- ct_map %>%
+  addLegend(
+    "bottomright",  # Position of the legend
+    colors = c("green", "yellow", "red"),  # Colors corresponding to groups
+    labels = c("Contract Strong", "Contract Soft", "No Contract"),  # Labels for legend
+    title = "Groups"  # Title for the legend
+  )
+
+# Display the map
+ct_map
+
+```
+
+```{r}
+# Save the map as an HTML file
+saveWidget(ct_map, file = "interactive_map.html")
+```
+
