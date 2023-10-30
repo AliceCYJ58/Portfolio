@@ -1,0 +1,423 @@
+---
+title: "Final Project 623"
+author: "Alice Cai"
+date: "2022-12-17"
+output: pdf_document
+---
+```{r}
+setwd("~/Desktop/BIS 623/Final_Project")
+AD <- read.csv("AD_data.csv")
+AD <- na.omit(AD)
+library(glmnet)
+library(ggfortify)
+library(lmtest)
+library(janitor)
+```
+
+```{r}
+mean(AD$AGE)
+sd(AD$AGE)
+
+mean(AD$FDG)
+sd(AD$FDG)
+
+mean(AD$ABETA)
+sd(AD$ABETA)
+
+mean(AD$TAU)
+sd(AD$TAU)
+
+mean(AD$PTAU)
+sd(AD$PTAU)
+
+mean(AD$Polygenic)
+sd(AD$Polygenic)
+
+mean(AD$CEREBRUM_TCV)
+sd(AD$CEREBRUM_TCV)
+
+mean(AD$CEREBRUM_TCB)
+sd(AD$CEREBRUM_TCB)
+
+mean(AD$CEREBRUM_TCC)
+sd(AD$CEREBRUM_TCC)
+
+mean(AD$CEREBRUM_GRAY)
+sd(AD$CEREBRUM_GRAY)
+
+mean(AD$CEREBRUM_WHITE)
+sd(AD$CEREBRUM_WHITE)
+
+mean(AD$LEFT_HIPPO)
+sd(AD$LEFT_HIPPO)
+
+mean(AD$RIGHT_HIPPO)
+sd(AD$RIGHT_HIPPO)
+
+mean(AD$TOTAL_HIPPO)
+sd(AD$TOTAL_HIPPO)
+
+mean(AD$TOTAL_CSF)
+sd(AD$TOTAL_CSF)
+
+mean(AD$TOTAL_GRAY)
+sd(AD$TOTAL_GRAY)
+
+mean(AD$TOTAL_WHITE)
+sd(AD$TOTAL_WHITE)
+
+mean(AD$TOTAL_WMH)
+sd(AD$TOTAL_WMH)
+
+mean(AD$TOTAL_BRAIN)
+sd(AD$TOTAL_BRAIN)
+
+mean(AD$PTEDUCAT)
+sd(AD$PTEDUCAT)
+```
+
+```{r}
+gender <- as.factor(AD$PTGENDER)
+race <- as.factor(AD$PTRACCAT)
+marry <- as.factor(AD$PTMARRY)
+apoe <- as.factor(AD$APOE4)
+levels(gender)
+levels(race)
+levels(marry)
+levels(apoe)
+tabyl(gender, sort = TRUE)
+tabyl(race, sort = TRUE)
+tabyl(marry, sort = TRUE)
+tabyl(apoe, sort = TRUE)
+
+claim1 <- c(1/2,1/2)
+chisq.test(table(gender),p=claim1)
+
+claim2 <- c(1/3,1/3,1/3)
+chisq.test(table(race),p=claim2)
+
+claim3 <- c(1/5,1/5,1/5,1/5,1/5)
+chisq.test(table(marry),p=claim3)
+
+claim4 <- c(1/3,1/3,1/3)
+chisq.test(table(apoe),p=claim4)
+```
+
+
+```{r}
+m1 <- lm(MMSE~AGE,data = AD)
+summary(m1)
+m2 <- lm(MMSE~PTGENDER,data = AD)
+summary(m2)
+m3 <- lm(MMSE~PTEDUCAT,data = AD)
+summary(m3)
+m4 <- lm(MMSE~PTRACCAT,data = AD)
+summary(m4)
+m5 <- lm(MMSE~PTMARRY,data = AD)
+summary(m5)
+m6 <- lm(MMSE~as.factor(APOE4),data = AD)
+summary(m6)
+m7 <- lm(MMSE~FDG,data = AD)
+summary(m7)
+m8 <- lm(MMSE~ABETA,data = AD)
+summary(m8)
+m9 <- lm(MMSE~TAU,data = AD)
+summary(m9)
+m10 <- lm(MMSE~PTAU,data = AD)
+summary(m10)
+m11 <- lm(MMSE~Polygenic,data = AD)
+summary(m11)
+m12 <- lm(MMSE~CEREBRUM_TCV,data = AD)
+summary(m12)
+m13 <- lm(MMSE~CEREBRUM_TCB,data = AD)
+summary(m13)
+m14 <- lm(MMSE~CEREBRUM_TCC,data = AD)
+summary(m14)
+m15 <- lm(MMSE~CEREBRUM_GRAY,data = AD)
+summary(m15)
+m16 <- lm(MMSE~CEREBRUM_WHITE,data = AD)
+summary(m16)
+m17 <- lm(MMSE~LEFT_HIPPO,data = AD)
+summary(m17)
+m18 <- lm(MMSE~RIGHT_HIPPO,data = AD)
+summary(m18)
+m19 <- lm(MMSE~TOTAL_HIPPO,data = AD)
+summary(m19)
+m20 <- lm(MMSE~TOTAL_CSF,data = AD)
+summary(m20)
+m21 <- lm(MMSE~TOTAL_GRAY,data = AD)
+summary(m21)
+m22 <- lm(MMSE~TOTAL_WHITE,data = AD)
+summary(m22)
+m23 <- lm(MMSE~TOTAL_WMH,data = AD)
+summary(m23)
+m24 <- lm(MMSE~TOTAL_BRAIN,data = AD)
+summary(m24)
+AD_V <- AD[,-c(1,3,5,6,14,18,24,25,26)]
+AD_V$APOE4 <- as.factor(AD_V$APOE4)
+```
+
+
+```{r}
+model_i <- lm(MMSE ~ 1, data = AD_V)
+summary(model_i)
+AIC(model_i)
+
+model_21 <- lm(MMSE ~ AGE, data = AD_V)
+model_22 <- lm(MMSE ~ PTEDUCAT, data = AD_V)
+model_23 <- lm(MMSE ~ APOE4, data = AD_V)
+model_24 <- lm(MMSE ~ FDG, data = AD_V)
+model_25 <- lm(MMSE ~ ABETA, data = AD_V)
+model_26 <- lm(MMSE ~ TAU, data = AD_V)
+model_27 <- lm(MMSE ~ PTAU, data = AD_V)
+model_28 <- lm(MMSE ~ Polygenic, data = AD_V)
+model_29 <- lm(MMSE ~ CEREBRUM_TCB, data = AD_V)
+model_210 <- lm(MMSE ~ CEREBRUM_TCC, data = AD_V)
+model_211 <- lm(MMSE ~ CEREBRUM_GRAY, data = AD_V)
+model_212 <- lm(MMSE ~ LEFT_HIPPO, data = AD_V)
+model_213 <- lm(MMSE ~ RIGHT_HIPPO, data = AD_V)
+model_214 <- lm(MMSE ~ TOTAL_HIPPO, data = AD_V)
+model_215 <- lm(MMSE ~ TOTAL_CSF, data = AD_V)
+model_216 <- lm(MMSE ~ TOTAL_GRAY, data = AD_V)
+
+AIC(model_21)
+AIC(model_22)
+AIC(model_23)
+AIC(model_24)
+AIC(model_25)
+AIC(model_26)
+AIC(model_27)
+AIC(model_28)
+AIC(model_29)
+AIC(model_210)
+AIC(model_211)
+AIC(model_212)
+AIC(model_213)
+AIC(model_214)
+AIC(model_215)
+AIC(model_216)
+```
+
+```{r}
+model_31 <- lm(MMSE ~ FDG + AGE, data = AD_V)
+model_32 <- lm(MMSE ~ FDG + PTEDUCAT, data = AD_V)
+model_33 <- lm(MMSE ~ FDG + APOE4, data = AD_V)
+model_34 <- lm(MMSE ~ FDG + ABETA, data = AD_V)
+model_35 <- lm(MMSE ~ FDG + TAU, data = AD_V)
+model_36 <- lm(MMSE ~ FDG + PTAU, data = AD_V)
+model_37 <- lm(MMSE ~ FDG + Polygenic, data = AD_V)
+model_38 <- lm(MMSE ~ FDG + CEREBRUM_TCB, data = AD_V)
+model_39 <- lm(MMSE ~ FDG + CEREBRUM_TCC, data = AD_V)
+model_310 <- lm(MMSE ~ FDG + CEREBRUM_GRAY, data = AD_V)
+model_311 <- lm(MMSE ~ FDG + LEFT_HIPPO, data = AD_V)
+model_312 <- lm(MMSE ~ FDG + RIGHT_HIPPO, data = AD_V)
+model_313 <- lm(MMSE ~ FDG + TOTAL_HIPPO, data = AD_V)
+model_314 <- lm(MMSE ~ FDG + TOTAL_CSF, data = AD_V)
+model_315 <- lm(MMSE ~ FDG + TOTAL_GRAY, data = AD_V)
+
+AIC(model_31)
+AIC(model_32)
+AIC(model_33)
+AIC(model_34)
+AIC(model_35)
+AIC(model_36)
+AIC(model_37)
+AIC(model_38)
+AIC(model_39)
+AIC(model_310)
+AIC(model_311)
+AIC(model_312)
+AIC(model_313)
+AIC(model_314)
+AIC(model_315)
+```
+
+```{r}
+model_41 <- lm(MMSE ~ FDG + LEFT_HIPPO + AGE, data = AD_V)
+model_42 <- lm(MMSE ~ FDG + LEFT_HIPPO + PTEDUCAT, data = AD_V)
+model_43 <- lm(MMSE ~ FDG + LEFT_HIPPO + APOE4, data = AD_V)
+model_44 <- lm(MMSE ~ FDG + LEFT_HIPPO + ABETA, data = AD_V)
+model_45 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU, data = AD_V)
+model_46 <- lm(MMSE ~ FDG + LEFT_HIPPO + PTAU, data = AD_V)
+model_47 <- lm(MMSE ~ FDG + LEFT_HIPPO + Polygenic, data = AD_V)
+model_48 <- lm(MMSE ~ FDG + LEFT_HIPPO + CEREBRUM_TCB, data = AD_V)
+model_49 <- lm(MMSE ~ FDG + LEFT_HIPPO + CEREBRUM_TCC, data = AD_V)
+model_410 <- lm(MMSE ~ FDG + LEFT_HIPPO + CEREBRUM_GRAY, data = AD_V)
+model_411 <- lm(MMSE ~ FDG + LEFT_HIPPO + RIGHT_HIPPO, data = AD_V)
+model_412 <- lm(MMSE ~ FDG + LEFT_HIPPO + TOTAL_HIPPO, data = AD_V)
+model_413 <- lm(MMSE ~ FDG + LEFT_HIPPO + TOTAL_CSF, data = AD_V)
+model_414 <- lm(MMSE ~ FDG + LEFT_HIPPO + TOTAL_GRAY, data = AD_V)
+AIC(model_41)
+AIC(model_42)
+AIC(model_43)
+AIC(model_44)
+AIC(model_45)
+AIC(model_46)
+AIC(model_47)
+AIC(model_48)
+AIC(model_49)
+AIC(model_410)
+AIC(model_411)
+AIC(model_412)
+AIC(model_413)
+AIC(model_414)
+summary(model_45)
+```
+
+```{r}
+model_51 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + AGE, data = AD_V)
+model_52 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + PTEDUCAT, data = AD_V)
+model_53 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + APOE4, data = AD_V)
+model_54 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + ABETA, data = AD_V)
+model_55 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + PTAU, data = AD_V)
+model_56 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + Polygenic, data = AD_V)
+model_57 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCB, data = AD_V)
+model_58 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC, data = AD_V)
+model_59 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_GRAY, data = AD_V)
+model_510 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + RIGHT_HIPPO, data = AD_V)
+model_511 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + TOTAL_HIPPO, data = AD_V)
+model_512 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + TOTAL_CSF, data = AD_V)
+model_513 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + TOTAL_GRAY, data = AD_V)
+
+AIC(model_51)
+AIC(model_52)
+AIC(model_53)
+AIC(model_54)
+AIC(model_55)
+AIC(model_56)
+AIC(model_57)
+AIC(model_58)
+AIC(model_59)
+AIC(model_510)
+AIC(model_511)
+AIC(model_512)
+AIC(model_513)
+summary(model_58)
+```
+
+```{r}
+model_61 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + AGE, data = AD_V)
+model_62 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT, data = AD_V)
+model_63 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + APOE4, data = AD_V)
+model_64 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + ABETA, data = AD_V)
+model_65 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTAU, data = AD_V)
+model_66 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + Polygenic, data = AD_V)
+model_67 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + CEREBRUM_TCB, data = AD_V)
+model_68 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + CEREBRUM_GRAY, data = AD_V)
+model_69 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + RIGHT_HIPPO, data = AD_V)
+model_610 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + TOTAL_HIPPO, data = AD_V)
+model_611 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + TOTAL_CSF, data = AD_V)
+model_612 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + TOTAL_GRAY, data = AD_V)
+
+AIC(model_61)
+AIC(model_62)
+AIC(model_63)
+AIC(model_64)
+AIC(model_65)
+AIC(model_66)
+AIC(model_67)
+AIC(model_68)
+AIC(model_69)
+AIC(model_610)
+AIC(model_611)
+AIC(model_612)
+summary(model_62)
+```
+
+```{r}
+model_71 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + AGE, data = AD_V)
+model_72 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + APOE4, data = AD_V)
+model_73 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + ABETA, data = AD_V)
+model_74 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT+ PTAU, data = AD_V)
+model_75 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic, data = AD_V)
+model_76 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + CEREBRUM_TCB, data = AD_V)
+model_77 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + CEREBRUM_GRAY, data = AD_V)
+model_78 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + RIGHT_HIPPO, data = AD_V)
+model_79 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + TOTAL_HIPPO, data = AD_V)
+model_710 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + TOTAL_CSF, data = AD_V)
+model_711 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + TOTAL_GRAY, data = AD_V)
+
+AIC(model_71)
+AIC(model_72)
+AIC(model_73)
+AIC(model_74)
+AIC(model_75)
+AIC(model_76)
+AIC(model_77)
+AIC(model_78)
+AIC(model_79)
+AIC(model_710)
+AIC(model_711)
+
+summary(model_75)
+```
+
+```{r}
+model_81 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic +AGE, data = AD_V)
+model_82 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + ABETA, data = AD_V)
+model_83 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT+ Polygenic + PTAU, data = AD_V)
+model_84 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + APOE4, data = AD_V)
+model_85 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + CEREBRUM_TCB, data = AD_V)
+model_86 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + CEREBRUM_GRAY, data = AD_V)
+model_87 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + RIGHT_HIPPO, data = AD_V)
+model_88 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + TOTAL_HIPPO, data = AD_V)
+model_89 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + TOTAL_CSF, data = AD_V)
+model_810 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic + TOTAL_GRAY, data = AD_V)
+
+AIC(model_81)
+AIC(model_82)
+AIC(model_83)
+AIC(model_84)
+AIC(model_85)
+AIC(model_86)
+AIC(model_87)
+AIC(model_88)
+AIC(model_89)
+AIC(model_810)
+```
+
+```{r}
+AD_1 <- AD_V[-c(445,117,185,450,422,380),]
+FINAL_MODEL12 <- lm(MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic, data = AD_1)
+plot(FINAL_MODEL12,1:6)
+
+FINAL_MODEL1 <- model_75
+summary(FINAL_MODEL1)
+plot(FINAL_MODEL1,1:6)
+dwtest (MMSE ~ FDG + LEFT_HIPPO + TAU + CEREBRUM_TCC + PTEDUCAT + Polygenic, tol = 1e-20, data = AD_V)
+cor(AD_V[,c("FDG","LEFT_HIPPO","TAU","CEREBRUM_TCC","PTEDUCAT","Polygenic")])
+plot (residuals (FINAL_MODEL1)[-530] , residuals (FINAL_MODEL1)[-1] , 
+      xlab= expression (e [i]) , ylab=expression (e [i + 1]))
+plot (residuals (FINAL_MODEL1), ylab="Residuals")
+abline(h=0)
+```
+
+```{r}
+x = as.matrix(AD_V[,-5])
+y = as.matrix(AD_V[,5])
+set.seed(1000)
+log2_lam <- seq(-2, 14, by = 0.1)
+cv.out = cv.glmnet(x, y, alpha = 1,nfolds=10)
+plot(cv.out)
+bestlam = cv.out$lambda.min
+bestlam
+model.lasso = glmnet(x,y, lambda = bestlam)
+coefs = as.matrix(coef(model.lasso))
+coef(model.lasso)
+
+x1 <- x[, c(2,3,4,12,13)]
+model.lasso1 = glmnet(x1,y, lambda = bestlam)
+coef(model.lasso1)
+cor(AD_V[,c("PTEDUCAT","LEFT_HIPPO","RIGHT_HIPPO","APOE4","FDG")])
+
+model_lm <- lm(MMSE ~APOE4 +FDG +PTEDUCAT +RIGHT_HIPPO, data = AD_V)
+summary(model_lm)
+plot(model_lm,1:6)
+
+plot (residuals (model_lm)[-530] , residuals (model_lm)[-1] , 
+      xlab= expression (e [i]) , ylab=expression (e [i + 1]))
+plot (residuals (model_lm), ylab="Residuals")
+abline(h=0)
+dwtest (MMSE ~APOE4+FDG +PTEDUCAT +RIGHT_HIPPO, data= AD_V)
+```
+
