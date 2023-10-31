@@ -1,0 +1,458 @@
+---
+title: "Survival Analysis"
+author: "Alice Cai"
+date: "2023-04-08"
+output: pdf_document
+---
+```{r}
+library(survival)
+library(survminer)
+library(KMsurv)
+library(ggplot2)
+veteran <- veteran
+```
+
+***Table***
+
+
+The following R codes were used to calculate the numbers in Table 1.
+
+
+```{r, results='hide'}
+# Sort to test and standard
+test <- veteran[veteran$trt == 2, ]
+standard <- veteran[veteran$trt == 1, ]
+
+#Get mean and sd for age
+mean(test$age)
+sd(test$age)
+mean(standard$age)
+sd(standard$age)
+mean(veteran$age)
+sd(veteran$age)
+
+#Get count of each age categories and percentage for test
+nrow(test[test$age <= 45, ])
+nrow(test[test$age <= 45, ])/nrow(test)
+nrow(test[test$age <= 60, ]) - nrow(test[test$age <= 45, ])
+19/68
+nrow(test[test$age > 60, ])
+39/68
+
+#Get count of each age categories and percentage for standard
+nrow(standard[standard$age <= 45, ])
+nrow(standard[standard$age <= 45, ])/nrow(standard)
+nrow(standard[standard$age <= 60, ]) - nrow(standard[standard$age <= 45, ])
+18/69
+nrow(standard[standard$age > 60, ])
+38/69
+
+#Get count of each age categories and percentage for overall
+nrow(veteran[veteran$age <= 45, ])
+nrow(veteran[veteran$age <= 45, ])/nrow(veteran)
+nrow(veteran[veteran$age <= 60, ]) - nrow(veteran[veteran$age <= 45, ])
+37/137
+nrow(veteran[veteran$age > 60, ])
+77/137
+
+#Get mean and sd for performance score
+mean(test$karno)
+sd(test$karno)
+mean(standard$karno)
+sd(standard$karno)
+mean(veteran$karno)
+sd(veteran$karno)
+
+#Get count of each performance score categories and percentage for test
+nrow(test[test$karno <= 25, ])
+nrow(test[test$karno <= 25, ])/nrow(test)
+
+nrow(test[test$karno <= 50, ]) - nrow(test[test$karno <= 25, ])
+22/68
+
+nrow(test[test$karno <= 75, ]) - nrow(test[test$karno <= 50, ])
+26/68
+
+nrow(test[test$karno > 75, ])
+15/68
+
+#Get count of each performance score categories and percentage for standard
+nrow(standard[standard$karno <= 25, ])
+nrow(standard[standard$karno <= 25, ])/nrow(standard)
+
+nrow(standard[standard$karno <= 50, ]) - nrow(standard[standard$karno <= 25, ])
+22/69
+
+nrow(standard[standard$karno <= 75, ]) - nrow(standard[standard$karno <= 50, ])
+26/69
+
+nrow(standard[standard$karno > 75, ])
+18/69
+
+#Get count of each performance score categories and percentage for overall
+nrow(veteran[veteran$karno <= 25, ])
+nrow(veteran[veteran$karno <= 25, ])/nrow(veteran)
+
+nrow(veteran[veteran$karno <= 50, ]) - nrow(veteran[veteran$karno <= 25, ])
+44/137
+
+nrow(veteran[veteran$karno <= 75, ]) - nrow(veteran[veteran$karno <= 50, ])
+52/137
+
+nrow(veteran[veteran$karno > 75, ])
+33/137
+
+#Get count of each cell type categories and percentage for test
+nrow(test[test$celltype == "squamous", ])
+nrow(test[test$celltype == "squamous", ])/nrow(test)
+
+nrow(test[test$celltype == "smallcell", ])
+nrow(test[test$celltype == "smallcell", ])/nrow(test)
+
+nrow(test[test$celltype == "adeno", ])
+nrow(test[test$celltype == "adeno", ])/nrow(test)
+
+nrow(test[test$celltype == "large", ])
+nrow(test[test$celltype == "large", ])/nrow(test)
+
+#Get count of each cell type categories and percentage for standard
+nrow(standard[standard$celltype == "squamous", ])
+nrow(standard[standard$celltype == "squamous", ])/nrow(standard)
+
+nrow(standard[standard$celltype == "smallcell", ])
+nrow(standard[standard$celltype == "smallcell", ])/nrow(standard)
+
+nrow(standard[standard$celltype == "adeno", ])
+nrow(standard[standard$celltype == "adeno", ])/nrow(standard)
+
+nrow(standard[standard$celltype == "large", ])
+nrow(standard[standard$celltype == "large", ])/nrow(standard)
+
+#Get count of each cell type categories and percentage for overall
+nrow(veteran[veteran$celltype == "squamous", ])
+nrow(veteran[veteran$celltype == "squamous", ])/nrow(veteran)
+
+nrow(veteran[veteran$celltype == "smallcell", ])
+nrow(veteran[veteran$celltype == "smallcell", ])/nrow(veteran)
+
+nrow(veteran[veteran$celltype == "adeno", ])
+nrow(veteran[veteran$celltype == "adeno", ])/nrow(veteran)
+
+nrow(veteran[veteran$celltype == "large", ])
+nrow(veteran[veteran$celltype == "large", ])/nrow(veteran)
+```
+
+
+```{r}
+knitr::include_graphics("~/Desktop/630/630HW5.png")
+```
+
+
+***Edit Variables***
+
+
+```{r}
+#Set categorical variables
+
+for (i in 1: nrow(veteran)){
+  
+  if (veteran$age[i] <= 45){
+    veteran$ageCat[i] = 0
+  }
+  else if(veteran$age[i] <= 60){
+    veteran$ageCat[i] = 1
+  }
+  else{
+    veteran$ageCat[i] = 2
+  }
+  
+  if (veteran$karno[i] <= 25){
+    veteran$karnoCat[i] = 0
+  }
+  else if(veteran$karno[i] <= 50){
+    veteran$karnoCat[i] = 1
+  }
+  else if(veteran$karno[i] <= 75){
+    veteran$karnoCat[i] = 2
+  }
+  else{
+    veteran$karnoCat[i] = 3
+  }
+}
+
+
+#Change reference level
+veteran$trt <- as.factor(veteran$trt)
+veteran$ageCat <- as.factor(veteran$ageCat)
+veteran$karnoCat <- as.factor(veteran$karnoCat)
+veteran <- within(veteran, trt <- relevel(trt, ref = 1))
+veteran <- within(veteran, celltype <- relevel(celltype, ref = "squamous"))
+veteran <- within(veteran, ageCat <- relevel(ageCat, ref = "0"))
+veteran <- within(veteran, karnoCat <- relevel(karnoCat, ref = "0"))
+```
+
+
+***Kaplan-Meier Curve for Treatment***
+
+
+```{r}
+survival_trt <- survfit(Surv(time, status) ~ trt, data = veteran, stype = 1, ctype = 1)
+
+ggsurvplot(survival_trt, veteran,
+title="Fig 1, Survival Curve for Treatment",
+xlab="Time",
+ylab="Probability of Survival",
+font.x=c(12, "bold", "black"),
+font.y=c(12, "bold", "black"),
+conf.int=F, axes.offset=F,
+xlim=c(0, 420), ylim=c(0, 1.1),
+break.time.by=50,
+font.main=c(12, "bold", "black"),
+font.tickslab=c(12, "black"),
+legend.title = "Treatment type",
+legend.labs = c("Standard", "Test")
+)
+```
+
+From the survival curve, we can see that the standard treatment curve would have a higher survival rate at the beginning of time, and at around time 200, the two curves crossed and the test treatment group would have a higher survival rate compared to the standard group.
+
+Since the two lines cross each other, the cox model may not have a suitable fit on treatment's impact on survival.
+
+***Kaplan-Meier Curve for Age Group***
+
+
+```{r}
+survival_age <- survfit(Surv(time, status) ~ ageCat, data = veteran, stype = 1, ctype = 1)
+
+ggsurvplot(survival_age, veteran,
+title="Fig 2, Survival Curve for Age Groups",
+xlab="Time",
+ylab="Probability of Survival",
+font.x=c(12, "bold", "black"),
+font.y=c(12, "bold", "black"),
+conf.int=F, axes.offset=F,
+xlim=c(0, 420), ylim=c(0, 1.1),
+break.time.by=50,
+font.main=c(12, "bold", "black"),
+font.tickslab=c(12, "black"),
+legend.title = "Age Group",
+legend.labs = c("<=45", "45-50", ">60"))
+```
+
+From the survival curves we can see that overall, people younger than 45 years old and older than 60 years old would have a lower survival rate compared to people between 45 and 60. The survival curves for people older than 6 and younger than 45 have several crossing points and intertwined each other.
+
+For the cox model, the impact of age may be fit for the 45 to 60 age group but may not be suitable for the other two because of the crossing survival lines.
+
+***Kaplan-Meier Curve for Cell Type***
+
+
+```{r}
+survival_cell <- survfit(Surv(time, status) ~ celltype, data = veteran, stype = 1, ctype = 1)
+
+ggsurvplot(survival_cell, veteran,
+title="Fig 3, Survival Curve for Cell Types",
+xlab="Time",
+ylab="Probability of Survival",
+font.x=c(12, "bold", "black"),
+font.y=c(12, "bold", "black"),
+conf.int=F, axes.offset=F,
+xlim=c(0, 420), ylim=c(0, 1.1),
+break.time.by=50,
+font.main=c(12, "bold", "black"),
+font.tickslab=c(12, "black"),
+legend.title = "Cell Type",
+)
+```
+
+From the survival curves, we can see that before time 200, cell types adeno and small have similar survival rates while cell types squamous and large have similar survival rates, which is higher than adeno and small. After time 200, cell types small and large would have survival rates becoming similar to each other while cell type squamous always have higher survival rate compared to the rest of the cell types.
+
+Since all of the four survival lines cross each other, there may not be a significant impact of cell types on survival using the cox model. However, effects may be shown for times before 200 because there were significant seperation.
+
+***Kaplan-Meier Curve for Karnofsky Performance Score***
+
+
+```{r}
+survival_score <- survfit(Surv(time, status) ~ karnoCat, data = veteran, stype = 1, ctype = 1)
+
+ggsurvplot(survival_score, veteran,
+title="Fig 4, Survival Curve for Karnofsky Performance Score",
+xlab="Time",
+ylab="Probability of Survival",
+font.x=c(12, "bold", "black"),
+font.y=c(12, "bold", "black"),
+conf.int=F, axes.offset=F,
+xlim=c(0, 420), ylim=c(0, 1.1),
+break.time.by=50,
+font.main=c(12, "bold", "black"),
+font.tickslab=c(12, "black"),
+legend.title = "Karnofsky Performance Score",
+legend.labs = c("<=25","25-50", "50-75",">75"))
+
+```
+
+When looking at the survival curves for Karnofsky Performance Score groups, we can see a clear trend. People with scores higher than 75 would have the highest survival probability at all times and followed by people with scores between 50 and 75. People with scores between 25 and 50 would have a lower survival probability, which then followed bt people with scores lower than 25. Overall, people with higher scores would have a higher survival probability based on the survival curves.
+
+The cox model may be best for the Karnofsky Performance Score's impact on Survival because all of the four survival curves seem to be clear from each other and is showing a clear trend as described above.
+
+
+```{r}
+model1 <- coxph(Surv(time, status) ~ 1, data = veteran)
+res1 <- residuals(model1, type = "martingale")
+veteran_mod1 <- data.frame(veteran$age, res1)
+veteran_mod1 <- veteran_mod1[order(veteran_mod1$veteran.age), ]
+loess_1 <- loess(res1 ~ veteran.age, data = veteran_mod1)
+plot(veteran_mod1$veteran.age, y = veteran_mod1$res1, 
+     main = "Fig 5, Martingale Residuals", 
+     xlab = "Age", ylab = "Martingale Residual")
+lines(predict(loess_1), x = veteran_mod1$veteran.age, col = "blue")
+```
+
+From the Martingale Residual plot with age, we can see that the residual line is not linear, and maybe there is a quadratic relationship shown in the graph. Therefore, the functional form of age for its impact on survival may not be linear, without adjusting for other covariates. And a transformation may be needed.
+
+
+```{r}
+model2 <- coxph(Surv(time, status) ~ celltype + karno, data = veteran)
+res2 <- residuals(model2, type = "martingale")
+veteran_mod2 <- data.frame(veteran$age, res2)
+veteran_mod2 <- veteran_mod2[order(veteran_mod2$veteran.age), ]
+loess_2 <- loess(res2 ~ veteran.age, data = veteran_mod2)
+plot(veteran_mod2$veteran.age, y = veteran_mod2$res2, 
+     main = "Fig 6, Martingale Residuals", 
+     xlab = "Age", ylab = "Martingale Residual")
+lines(loess_2$fitted, x = veteran_mod2$veteran.age, col = "blue")
+```
+
+
+We fitted the survival model using covariates Karno and Celltype. From the Martingale Residual plot with age, we can see that the residual line is approximately linear, as shown in the graph. Therefore, the functional form of age for its impact on survival may be linear, adjusting for other covariates (cell type and karno). 
+
+
+
+```{r}
+model3 <- coxph(Surv(time, status) ~ 1, data = veteran)
+res3 <- residuals(model3, type = "martingale")
+veteran_mod3 <- data.frame(veteran$karno, res3)
+veteran_mod3 <- veteran_mod3[order(veteran_mod3$veteran.karno), ]
+loess_3 <- loess(res3 ~ veteran.karno, data = veteran_mod3)
+plot(veteran_mod3$veteran.karno, y = veteran_mod3$res3, 
+     main = "Fig 7, Martingale Residuals", 
+     xlab = "Karnofsky Performance Score", ylab = "Martingale Residual")
+lines(loess_3$fitted, x = veteran_mod3$veteran.karno, col = "blue")
+```
+
+From the Martingale Residual plot with Karnofsky Performance Score, we can see that the residual line is approximately linear. Therefore, the functional form of Karnofsky Performance Score for its impact on survival may be linear, without adjusting for other covariates. 
+
+
+
+
+***Treatment***
+
+```{r}
+standard_fit <- survfit(Surv(time, status) ~ 1, standard)
+test_fit<- survfit(Surv(time, status) ~ 1, test)
+plot(log(standard_fit$time), log(standard_fit$cumhaz), type = "l",
+xlab = "Log of Survival Time", ylab = "logH(t)", main = "Fig.8 Log Cumulative Hazard Plot For Treatment",
+col = 1)
+lines(log(test_fit$time), log(test_fit$cumhaz), col = 2)
+legend("topleft", col = 1:2, c("Standard", "Test"), lty = 1,cex=0.8)
+```
+
+From the cumulative hazard plot for Treatment groups, we can see that the lines cross each other. Therefore, the model's PH assumption for Treatment groups doesn't hold.
+
+
+***Cell Type***
+
+```{r}
+Squamous <- survfit(Surv(time, status) ~ 1, veteran[veteran$celltype == "squamous", ])
+Small <- survfit(Surv(time, status) ~ 1, veteran[veteran$celltype == "smallcell", ])
+Adeno <- survfit(Surv(time, status) ~ 1, veteran[veteran$celltype == "adeno", ])
+Large <- survfit(Surv(time, status) ~ 1, veteran[veteran$celltype == "large", ])
+
+plot(log(Squamous$time), 
+     log(Squamous$cumhaz), type = "l",
+     xlab = "Log of Survival Time", ylab = "logH(t)", 
+     main = "Fig.9 Log Cumulative Hazard plot for Celltype", col = 1)
+lines(log(Small$time), log(Small$cumhaz), col = 2)
+lines(log(Adeno$time), log(Adeno$cumhaz), col = 3)
+lines(log(Large$time), log(Large$cumhaz), col = 4)
+legend("topleft", col = 1:4, c("Squamous", "Small", "Adeno", "Large"), lty = 1,cex=0.8)
+```
+
+
+From the cumulative hazard plot for Cell types, we can see that the lines cross each other. Therefore, the model's PH assumption for Cell types doesn't hold.
+
+
+***Karnofsky Performance Score***
+
+```{r}
+karno0 <- survfit(Surv(time, status) ~ 1, veteran[veteran$karnoCat == 0, ])
+karno1 <- survfit(Surv(time, status) ~ 1, veteran[veteran$karnoCat == 1, ])
+karno2 <- survfit(Surv(time, status) ~ 1, veteran[veteran$karnoCat == 2, ])
+karno3 <- survfit(Surv(time, status) ~ 1, veteran[veteran$karnoCat == 3, ])
+
+plot(log(karno0$time), log(karno0$cumhaz), type = "l",
+     xlab = "Survival Time", ylab = "logH(t)", 
+     main = "Fig.10 Log Cumulative Hazard Plot For Karnofsky Performance Score",
+     col = 1, xlim = c(0, 7), ylim = c(-4, 1))
+lines(log(karno1$time), log(karno1$cumhaz), col = 2)
+lines(log(karno2$time), log(karno2$cumhaz), col = 3)
+lines(log(karno3$time), log(karno3$cumhaz), col = 4)
+legend("bottomright", col = 1:4, c("<=25", "25-50", "50-75", ">75"), lty = 1,cex=0.7)
+```
+
+From the cumulative hazard plot for Karnofsky Performance Score, we can see that the lines for scores <=25 and 25-50 doesn't cross, but the lines for 50-75 and >75 cross each other at the beginning and the end. Therefore, the model's PH assumption for Cell types doesn't hold.
+
+
+***Test***
+
+```{r}
+cox_model <- coxph(Surv(time, status) ~ trt + celltype + karno, data = veteran)
+ph_test <- cox.zph(cox_model, transform = "rank", global = T)
+ph_test$table
+```
+
+From the table, we can see that the p-value for the global test is less than 0.05, therefore, we have confident evidence to reject the null hypothesis and conclude that the PH assumption for the model doesn't hold. 
+
+For the specific covariates, treatment has pvalue larger than 0.05, meaning that treatment's PH assumption may be not violated, which is a contrary to the plot, but celltype and karno have pvalues smaller than 0.05, which means that their PH assumption don't hold, which is consistent with the plots.
+
+
+
+
+```{r}
+res_cox <- residuals(cox_model, type = "deviance")
+pred_cox <- cox_model$linear.predictors
+plot(pred_cox, res_cox, xlab = "Risk Score", ylim = c(-4, 4),
+ylab = "Deviance Residuals", main = "Fig.11 Deviance Residual Plot")
+abline(h = c(-3, 3), col = "red", lty = 2)
+```
+
+From the Deviance Residual Plot we can see that there is only one outlier outside of the 3 to -3 boundry line. We need to find out the outlier and delete it to fit a new model.
+
+
+```{r}
+outlier <- which(as.vector(res_cox) <= -3)
+fit_new <- coxph(Surv(time, status) ~ trt + celltype + karno,
+data = veteran[-outlier,])
+summary(cox_model)
+summary(fit_new)
+```
+
+When looking at the two models (before and after deleting the outliers), we can see that the coefficients are different, meaning that the outlier has influence on the model fitting, therefore, we can conclude that that outlier is an influential point.
+
+
+```{r}
+survival_for_model <- survfit(cox_model)
+H0 <- -log(survival_for_model$surv)
+H <- approxfun(c(0, survival_for_model$time), c(0, H0), method = "constant")
+e1 <- H(cox_model$y[, 1]) * exp(cox_model$linear.predictors)
+efit <- survfit(Surv(e1, cox_model$y[, 2]) ~ 1)
+plot(efit, fun = "cumhaz", mark.time = F, bty = "n", conf.int = T,
+xlab='Cox-Snell Residual', ylab='Cumulative Hazard',
+main = "Fig.12 Cox-Snell Residual plot",
+xlim = c(0, 4), ylim = c(0, 4))
+abline(a = 0, b = 1, col = 2)
+```
+
+
+From the Cox-Snell Residual plot, we can see that the cumulative hazard curve approximately follow the expected  45 degrees straight line (red) with slope 1 and intercept 0 and does not exceed the CI range. Therefore, we can conclude that the overall fit of the Cox model using covariates treatment, cell type, and karno score ranges is appropriate. 
+
+
