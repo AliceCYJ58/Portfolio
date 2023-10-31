@@ -1,0 +1,674 @@
+---
+title: "Analysis of Breast Cancer Diagnosis Using Tumor Characteristics"
+author: "Alice Cai"
+date: "2023-05-03"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+## Introduction
+
+Breast cancer is the single most prevalent cancer in women, accounting for almost one-third of all
+cancer diagnoses in this segment of the population, and it additionally constitutes the second greatest cause of cancer-related death in women. Breast tissue tumors, or aberrant cell development in the breast tissue, are the root of breast cancer (1, 5). With its highest mortality rate among women, thorough research became the must in order to unwind the intractable situation and alleviate the urgent burden. Based on the current research findings, breast cancer with various stages, types and diagnosis have shown different levels of curability and survival outcome, and therefore requires distinctive treatment methods to pursue the best prognostic effect. Thus, being able to recognize and predict the characteristics of breast cancer is the pivotal goal in the current progress. As a heterogeneous disease, breast cancer consists of several entities with unique histological and biological characteristics, clinical presentations and behaviors, and therapeutic responses. And recent studies have been focused on the genetic composition and biomarker of breast cancer but not the prediction of breast cancer diagnosis. 
+
+```{r include=FALSE}
+library(readxl)
+library(ggplot2)
+library(maps)
+library(mapdata)
+library(usmap)
+library(usmapdata)
+library(ggrepel)
+#Set working directory
+setwd("~/Desktop/SDS 563/Final Project")
+#Load library
+library(corrplot)
+library(PerformanceAnalytics)
+library("car")
+library(gdata)
+library(MASS)
+library(biotools)
+library(cluster)
+library(fpc)
+library(amap)
+library(vegan)
+library(gridExtra)
+library(biotools)
+library(klaR)
+library(car)
+library(dplyr)
+library(lubridate)
+library(ggExtra)
+library(heplots)
+library(plotrix)
+#Load Data
+Breast_Cancer_1 <- read.csv("data.csv")
+```
+
+
+```{r include=FALSE}
+breast_rate <- read_excel("breast cancer rate 1.xlsx")
+map_df <- us_map(regions = "states")
+label_df <- usmapdata::centroid_labels(regions = "states")
+```
+
+
+```{r include=FALSE}
+label_df_s1 <- label_df %>%
+   dplyr::filter(!abbr %in% c("VT",  "NH", "MA", "RI", "CT", "NJ", "MD", "DC",
+                            "DE"))
+
+```
+
+
+```{r include=FALSE}
+label_df_s2 <- label_df %>%
+  dplyr::filter(abbr %in% c("VT",  "NH", "MA", "RI", "CT", "NJ", "MD", "DC",
+                            "DE")) %>%
+  mutate(
+    y_adj = case_when(abbr == "VT" ~ +12, 
+                      abbr == "NH" ~ +9,
+                      abbr == "MA" ~ +6,
+                      abbr == "RI" ~ 0, 
+                      abbr == "CT" ~ -6, 
+                      abbr == "NJ" ~ -3,
+                      abbr == "MD" ~ -6, 
+                      abbr == "DE" ~ -12,
+                      abbr == "DC" ~ -18),
+    new_x = max(map_df$x) + 10^5.3,
+    new_y = y + y_adj * 25000, 
+    group = 1:9)
+```
+
+```{r include=FALSE}
+colnames(breast_rate)[1] <- "state"
+breast_rate[2] <- sapply(breast_rate[2],as.numeric)
+```
+
+```{r echo=FALSE, warning=FALSE}
+plot_usmap(data = breast_rate, values = "Rate", color = "black", regions = "states", na.rm = FALSE) + 
+    labs(title = "Breast Cancer Incidence Rate", subtitle = " Per 100,000") +
+  scale_fill_continuous(low="white", high="blue", guide = "colorbar", na.value = "white", 
+                        name = "Incidence", label = scales::comma) + 
+  theme(legend.position = "right") + 
+  geom_text(data = label_df_s1, aes(x=x, y=y, label = abbr), size = 3)+ 
+  geom_text(data = label_df_s2, aes(x=new_x + 35000, y = new_y, label = abbr), 
+            color = "black", size = 3) + 
+  geom_point(data = label_df_s2, aes(x=x, y = y), size = 0.8) + 
+  geom_point(data = label_df_s2, aes(x=new_x - 83000, y = new_y), size = 0.5) + 
+  geom_segment(data = label_df_s2, aes(x = x, xend = new_x - 83000, y = y, yend = new_y, group = group), linewidth = 0.05)
+
+```
+
+
+Breast tumor is frequently diagnosed through procedures like MRIs, mammograms, ultrasounds, and biopsies (6). Tumors can be benign (not cancerous), pre-malignant (pre-cancerous), or malignant (cancerous), therefore a tumor is not always an indication of cancer. Of all the breast lumps, benign lesions are more ordinary than malignant lesion for both males and females in all age groups (3). Of all the breast lumps, 60%-80% are benign. Although benign breast cancer are not life-threatening, malignant ones are extremely lethal and requires intense treatment and targeted therapy. Triple-negative breast cancer as the most detrimental malignant breast cancer, has a 5-year survival of only 66%. Thus, to clarify the breast cancer diagnosis is crucial. 
+
+
+In our analysis, we will focus on the prediction of breast cancer diagnosis (malignant or benign) and its relationship to predictors (tumor characteristic) such as tumor radius, texture, smoothness, compactness, etc. Specifically, we are going to delve deeper in the following research topics: the extent to which breast tumor characteristics (the predictors) and corrections data present dispensable information and detail, and how this information could be presented more effectively and well-ordered to understand the key variables in the data and to disentangle the hidden outliers (PCA); the level of variation in the tumor characteristics and the most appropriate grouping combination (cluster analysis); and if these tumor characteristics could be applied to analysis, then successfully and accurately predict which factor(s) is most related to breast cancer diagnosis (discriminant analysis). 
+
+
+## Data
+
+In order to examine the association between breast tumor characteristics (size, smoothness, concaveness, etc.) and breast cancer diagnosis (malignant/benign), we used data from the Machine Learning Repository in University of California, Irvine (4 archive.UCI). This repository provides diagnostic breast cancer data set from Clinical Sciences Center affiliated with University of Wisconsin, Madison. In this dataset, tumor characteristics are represented and quantified as radius, texture, perimeter, area, smoothness, compactness, concavity, number of concave points, symmetry, fractal_dimension. Tumor characteristics were tested each time the patients visit the clinic. And the conditions were well recorded for every visit. In this dataset, it includes the calculated mean, standard error, and worst value of (from) all the clinical visits. 
+
+
+When we explored the variables in the dataset, the standard error variables only represent the variations in the tumor data, and worst value variables only indicate the tumor characteristics in its worst condition (clinical visit). Since Breast Cancer is a prolonged disease, standard error and worst value would not be representative for identifying the tumor. Therefore, we exclude those variables from the dataset for our analysis. The tumor characteristics are our explanatory variables, and all of them are continuous. Our outcome variable is cancer diagnosis, which is a binary variable containing two level—malignant or benign. The statistics for our variables are summarized in tables 1 and 2. We also plotted a 3D pie chart (Figure 1) for our response variable "diagnosis" for percent malignant and benign diagnosis.
+
+**Table 1: Continuous Statistics for Breast Cancer Wisconsin (Diagnostic) Data Set**
+
+<br>
+
+| Variable               | Mean    | Standard Deviation | Minimum | Maximum |
+|------------------------|---------|--------------------|---------|---------|
+| radius_mean            | 14.127  |    3.524     | 6.981   | 28.110  |
+| texture_mean           | 19.290   |    4.301      | 9.710    | 39.280   |
+| perimeter_mean         | 91.970   |   24.299    | 43.790   | 188.500  |
+| area_mean              | 654.900   |    351.914  | 143.500   | 2501.000  |
+| smoothness_mean        | 0.096 |    0.014    | 0.05263 | 0.163 |
+| compactness_mean       | 0.104 |     0.053    | 0.019 | 0.345 |
+| concavity_mean         | 0.089 |   0.080     | 0.000 | 0.427|
+| concave.points_mean    | 0.049 |    0.039     | 0.000 | 0.201 |
+| symmetry_mean          | 0.181  |    0.027     | 0.106  | 0.304  |
+| fractal_dimension_mean | 0.063 |   0.007    | 0.050 | 0.097 |
+
+<br>
+
+**Table 2: Categorical Statistics for Breast Cancer Wisconsin (Diagnostic) Data Set**
+
+<br>
+
+| diagnosis            | Number of obsevation | Proportion    |
+|----------------------|-----------|-----------|
+| Malignant | 212       | 0.373     |
+| Benign   |  357  | 0.627 |
+
+<br>
+
+
+```{r include=FALSE}
+#Get rid of unsuablevariables
+Breast_Cancer_2 <- Breast_Cancer_1[ , 2:12]
+#Check NA
+sum(is.na(Breast_Cancer_2))
+#Variable Summary
+summary(Breast_Cancer_2)
+#SD for Continuous Variables
+apply(Breast_Cancer_2[2:11],2,sd)
+```
+
+```{r include=FALSE}
+#Subset for Malignant and Benign and Calculate Proportions
+M <- Breast_Cancer_2[Breast_Cancer_2$diagnosis == "M", ]
+B <- Breast_Cancer_2[Breast_Cancer_2$diagnosis == "B", ]
+nrow(M)
+nrow(B)
+nrow(Breast_Cancer_2)
+nrow(M)/nrow(Breast_Cancer_2)
+nrow(B)/nrow(Breast_Cancer_2)
+```
+
+
+```{r echo=FALSE}
+info = c(nrow(M)/nrow(Breast_Cancer_2), nrow(B)/nrow(Breast_Cancer_2))
+names = c("Malignant (37.3%)", "Benign (62.7%)")
+cols = c("pink", "lightblue")
+pie3D(info, labels = names, col=cols, explode = 0.1, main = "Figure 1: Percentage of Malignant and Benign Breast cancer")
+```
+
+
+
+Since the dataset uses patients visiting the Clinical Sciences center affiliated with University of Wisconsin, Madison without any precedent exclusion criteria, and breast cancer diagnosis is not tightly related to demographic factors, thus our data could generalize to the entire to give further inference of the most relevant factors that decide cancer diagnosis. 
+
+
+For the exploratory data analysis, we plotted histograms for each of the ten independent variables in our dataset (all continuous):
+
+**Figure 2: Histograms for Independent Variables**
+
+```{r echo=FALSE}
+#Histogram for Continuous Variables
+
+p1 <- ggplot(Breast_Cancer_2, aes(x = radius_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Radius Histogram",x="Mean Radius(mm)") 
+
+p2 <- ggplot(Breast_Cancer_2, aes(x = texture_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Texture Histogram",x="Mean Texture")
+
+p3 <- ggplot(Breast_Cancer_2, aes(x = perimeter_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Perimeter Histogram",x="Mean Perimeter(mm)")
+
+p4 <- ggplot(Breast_Cancer_2, aes(x = area_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Area Histogram",x="Mean Area(mm^2)")
+
+p5 <- ggplot(Breast_Cancer_2, aes(x = smoothness_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Smoothness Histogram",x="Mean Smoothness")
+
+p6 <- ggplot(Breast_Cancer_2, aes(x = compactness_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Compactness Histogram",x="Mean Compactness")
+
+p7 <- ggplot(Breast_Cancer_2, aes(x = concavity_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Concavity Histogram",x="Mean Concavity")
+
+p8 <- ggplot(Breast_Cancer_2, aes(x = concave.points_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Concave Points Histogram",x="Mean Concave points")
+
+p9 <- ggplot(Breast_Cancer_2, aes(x = symmetry_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Symmetry Histogram",x="Mean Symmetry")
+
+p10 <- ggplot(Breast_Cancer_2, aes(x = fractal_dimension_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Fractal Dimension Histogram",x="Mean Fractal Dimension")
+
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10,ncol=2)
+```
+
+
+From the histograms, we can see that some of the variables follow a normal distribution (bell curve) while some variables are skewed to the right. For those variables that are skewed to the right, we decided to do a square root transformation for ease of future analysis. Variables transformed include "area", "compactness", "concavity", "concave.points", and "fractal dimension". 
+
+```{r include=FALSE}
+Breast_Cancer_3 <- Breast_Cancer_2
+Breast_Cancer_3$area_mean <- sqrt(Breast_Cancer_3$area_mean)
+Breast_Cancer_3$compactness_mean <- sqrt(Breast_Cancer_3$compactness_mean)
+Breast_Cancer_3$concavity_mean <- sqrt(Breast_Cancer_3$concavity_mean)
+Breast_Cancer_3$concave.points_mean <- sqrt(Breast_Cancer_3$concave.points_mean)
+Breast_Cancer_3$fractal_dimension_mean <- sqrt(Breast_Cancer_3$fractal_dimension_mean)
+```
+
+
+After the transformation, we plot the histograms again:
+
+
+**Figure 3: Histograms for Transformed Independent Variables**
+
+```{r echo=FALSE}
+#Histogram for Continuous Variables
+
+p1.1 <- ggplot(Breast_Cancer_3, aes(x = radius_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Radius Histogram",x="Mean Radius(mm)") 
+
+p2.1 <- ggplot(Breast_Cancer_3, aes(x = texture_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Texture Histogram",x="Mean Texture")
+
+p3.1 <- ggplot(Breast_Cancer_3, aes(x = perimeter_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Perimeter Histogram",x="Mean Perimeter(mm)")
+
+p4.1 <- ggplot(Breast_Cancer_3, aes(x = area_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Area Histogram",x="Mean Area(mm^2)")
+
+p5.1 <- ggplot(Breast_Cancer_3, aes(x = smoothness_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Smoothness Histogram",x="Mean Smoothness")
+
+p6.1 <- ggplot(Breast_Cancer_3, aes(x = compactness_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Compactness Histogram",x="Mean Compactness")
+
+p7.1 <- ggplot(Breast_Cancer_3, aes(x = concavity_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Concavity Histogram",x="Mean Concavity")
+
+p8.1 <- ggplot(Breast_Cancer_3, aes(x = concave.points_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Concave Points Histogram",x="Mean Concave points")
+
+p9.1 <- ggplot(Breast_Cancer_3, aes(x = symmetry_mean)) + geom_histogram(color="black", fill="lightblue", bins = 30) + labs(title="Mean Symmetry Histogram",x="Mean Symmetry")
+
+p10.1 <- ggplot(Breast_Cancer_3, aes(x = fractal_dimension_mean)) + geom_histogram(color="black", fill="orange", bins = 30) + labs(title="Mean Fractal Dimension Histogram",x="Mean Fractal Dimension")
+
+grid.arrange(p1.1, p2.1, p3.1, p4.1, p5.1, p6.1, p7.1, p8.1, p9.1, p10.1,ncol=2)
+```
+
+From the histograms we can see that all of the variables seem to have a normal distribution and the trend imporved a lot after transformation for those variables that were skewed.
+
+However, univariate normality doesn't mean multivariate normality. For the next step of data exploration, we conducted the Chi-Square Quantile plot for the dataset:
+
+**Figure 4: Chi-square Quantile Plot**
+
+```{r echo=FALSE}
+# Chi-square Quantile plot
+source("http://www.reuningscherer.net/multivariate/R/CSQPlot.r.txt")
+CSQPlot(Breast_Cancer_3[, -1], label = "Breast Cancer Data")
+```
+
+
+From the Chi-square Quantile plot, we can see that our transformed data stay within the normal range in the first half of the quantiles. And the data points deviates from the normal quantile range exponentially at the lower half of the quantiles. Therefore, because of the obvious trend deviating from the normal quantile ranges, we can conclude that our data doesn't follow a multivariate normal distribution. But the multivariate techniques we are going to use don't need multivariate normal assumption to be met so we can proceed.
+
+
+## Methods & Results
+
+We use the following multivariate statistical methods to address our research questions:
+principal components analysis, cluster analysis, and discriminant data analysis. All statistical analyses were conducted in R statistical software packages. 
+
+
+### Section 1: Principal Components Analysis
+
+
+**Figure 5: Correlation Plot**
+
+```{r echo=FALSE}
+#Correlation Plot
+corrplot.mixed(cor(Breast_Cancer_3[, -1]), lower.col = "black", upper = "ellipse",
+               tl.col = "black", number.cex = .7, order = "hclust",
+               tl.pos = "lt", tl.cex = .7)
+```
+
+Looking at the correlation heatmap, there are a lot of deep blue and red circles, indicating strong correlation between most variables. The results can be validated from the correlation matrix on the left corners. There are a lot of positive and negative numbers with absolute values larger than 0.5, indicating strong correlations between variables. Therefore, we think principle component analysis would work well.
+
+```{r include=FALSE}
+#Conduct PCA
+pc1 = princomp(Breast_Cancer_3[, -1], cor = TRUE)
+# Percent method
+print(summary(pc1), digits = 2, cutoff = 0)
+```
+
+**Table 3: Results from Principal Components Analysis**
+
+|                         | Comp. 1 | Comp. 2 | Comp. 3 | Comp. 4 | Comp. 5 | Comp. 6 | Comp. 7 | Comp. 8 | Comp. 9 | Comp. 10 |
+|-------------------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|----------|
+| Standard Deviation (SD) | 2.33    | 1.59    | 0.94    | 0.72    | 0.59    | 0.40    | 0.25    | 0.18    | 0.02    | 0.02     |
+| Eigenvalue=SD^2         | 5.43    | 2.53    | 0.88    | 0.52    | 0.35    | 0.16    | 0.63    | 0.03    | 4e-04   | 4e-04    |
+| Proportion of Variance  | 0.55    | 0.25    | 0.09    | 0.05    | 0.04    | 0.02    | 0.01    | 0.003   | 0.00    | 0.00     |
+| Cumulative Proportion   | 0.55    | 0.80    | 0.89    | 0.94    | 0.97    | 0.99    | 1.00    | 1.00    | 0.99    | 1.00     |
+
+
+Table 3 shows that if I would like to explain at least 80% of the variance across my data, I would
+need to use the first two components (Comp1 and Comp2), which explain approximately 80% of the total variance. 
+
+
+```{r include=FALSE}
+# Eigenvalue > 1
+round(pc1$sdev^2,4)
+```
+
+
+**Table 4: Eigenvalues of Each Component**
+
+| Comp.1 | Comp.2 | Comp.3 | Comp.4 | Comp.5 | Comp.6 | Comp.7 | Comp.8 | Comp.9 | Comp.10 |
+|--------|--------|--------|--------|--------|--------|--------|--------|--------|---------|
+| 5.4504 | 2.5399 | 0.8814 | 0.5169 | 0.3529 | 0.1609 | 0.0635 | 0.0331 | 0.0007 | 0.0004  |
+
+
+For the “eigenvalue > 1” method, we would choose 2 principle components (both have eigenvalues larger than 1) since the third PC only has eigenvalue of 0.8986.  
+
+
+**Figure 6: Scree Plot**
+
+
+```{r echo=FALSE}
+# Scree Plot
+screeplot(pc1, type = "lines", col = "red", lwd = 2, pch = 19, cex = 1.2,
+          main = "Scree Plot of Breast Cancer Data")
+```
+
+Looking at the scree plot, we decide that the “elbow” is at PC number 3, therefore, we would choose two principle components. This reiterates that the great majority of the total variance in our data
+is explained by the first two components.
+
+As we showed in our data step, our data doesn't follow a multivariate normal distribution, therefore parallel analysis is not appropriate for our data. Therefore, using the two methods described above, we decided to choose two principle components for our analysis.
+
+We can also examine the principal components loadings to determine what trends each component picks up on.
+
+
+**Table 5: Results of Loadings from Principal Components Analysis**
+
+|                        | Comp.1 | Comp.2 | Comp.3 | Comp.4 | Comp.5 | Comp.6 | Comp.7 | Comp.8 | Comp.9 | Comp.10 |
+|------------------------|--------|--------|--------|--------|--------|--------|--------|--------|--------|---------|
+| radius_mean            | 0.37   | 0.31   | 0.12   | 0.05   | 0.04   | 0.30   | 0.06   | 0.05   | 0.03   | 0.81    |
+| texture_mean           | 0.15   | 0.15   | -0.96  | 0.00   | 0.21   | 0.00   | 0.03   | -0.02  | 0.00   | 0.00    |
+| perimeter_mean         | 0.38   | 0.28   | 0.11   | 0.04   | 0.01   | 0.30   | 0.01   | 0.07   | 0.70   | -0.43   |
+| area_mean              | 0.36   | 0.31   | 0.11   | 0.05   | 0.03   | 0.28   | 0.09   | 0.07   | -0.71  | -0.39   |
+| smoothness_mean        | 0.23   | -0.41  | 0.15   | -0.09  | 0.85   | -0.04  | 0.00   | 0.17   | 0.00   | 0.00    |
+| compactness_mean       | 0.37   | -0.27  | -0.05  | -0.19  | -0.23  | 0.04   | -0.83  | -0.06  | -0.06  | 0.01    |
+| concavity_mean         | 0.40   | -0.10  | -0.03  | -0.20  | -0.32  | -0.51  | 0.28   | 0.60   | 0.01   | 0.02    |
+| concave.point_mean     | 0.41   | -0.02  | 0.08   | -0.11  | -0.01  | -0.39  | 0.25   | -0.77  | 0.01   | -0.01   |
+| symmetry_mean          | 0.21   | -0.37  | -0.05  | 0.90   | -0.13  | -0.01  | 0.04   | 0.01   | 0.00   | 0.00    |
+| fractal_dimension_mean | 0.06   | -0.57  | -0.12  | -0.31  | -0.26  | 0.58   | 0.39   | -0.08  | -0.01  | 0.00    |
+
+
+From Table 5, we can see that Component 1 has high coefficients for area, perimeter, radius, concavity, number of concave points, and compactness. And Component 2 has high absolute coefficients values for smoothness, texture, fractal dimension, and symmetry. Therefore, we may conclude that the component 1 may be picking up on the size and shape of the tumor. While component 2 may be picking up on the texture of the tumor. We can also take a look at the biplot to get a better understanding of the two components.
+
+
+```{r include=FALSE}
+#Get loadings
+print(pc1$loadings, cutoff = 0, digits = 2)
+```
+
+
+**Figure 7: Biplot for PCA results**
+
+```{r echo=FALSE}
+# make a biplot for first two components
+biplot(princomp(Breast_Cancer_3[, -1], cor = TRUE), choices = c(1,2), pc.biplot = T)
+```
+
+
+From our Principal Component Analysis (PCA) plot, all the tumor characteristics could be divided into two components. 
+
+Component 1 are the horizontal bars of characteristics including area, perimeter, radius, concavity, number of concave points, and compactness. This component represents the size and shape of the tumor. Size characteristics contain area, perimeter, radius and compactness—density of the tumor site (perimeter^2 / area - 1.0); and shape characteristics include concavity—severity of concave portions of the contour, number of concave points—number of concave portions of the contour. The axis of Component 1 is a vector with magnitude in which along the axis from left to right, the magnitude increases. 
+
+Component 2 are the vertical bars of the characteristics including texture, smoothness, and fractal dimension. Texture is measured as the portion of grey area of a tumor site imaging, where the grey area indicates solid tissue growth and other color represents water or mucus. Smoothness of a tumor demonstrates the smoothness of a tumor surface. And fractal dimension is the “coastline dimension” of a tumor site, measuring the overall tidiness of the surface. The axis of component 2 is also a vector with magnitude in which along the axis from top to bottom, the magnitude decrease, suggesting the texture become softer and smoother. 
+
+
+Finally, we created a confidence ellipse plot, to test for outliers in Comp1 and Comp2.
+
+**Figure 8: PC Score Plot with 95% Confidence Ellipse for Outliers**
+
+```{r echo=FALSE}
+#draw the confidence ellipse for our two components
+source("http://reuningscherer.net/multivariate/r/ciscoreplot.R.txt")
+ciscoreplot(princomp(Breast_Cancer_3[,-1], cor = TRUE), c(1, 2),Breast_Cancer_3[, 2])
+```
+
+
+The score plot shows some outliers after the principle component analysis. However, the outliers are expected because our data doesn't follow a multivariate normal distribution and observations may go out of the 95% Confidence Interval. And the amount of outliers is relatively small compared to our total of 569 observations. Therefore, we think the PCA fits well. When looking at the PC axis, we can see more outliers toward the right of the scores of the first component, meaning the size characters of the tumor varies a lot. And this makes sense because tumors for both malignant and benign diagnosis would have difference in sizes and some benign tumors may be considerably larger than the rest of the tumors when looking at them together.
+
+
+
+## Section 2: Cluster Analysis
+
+
+```{r include=FALSE}
+# standardize data
+Breast_Cancer_4 <- Breast_Cancer_3[, -1]
+Uninorm <- scale(na.omit(Breast_Cancer_4))
+dim(Uninorm)
+```
+
+For this section, we used different dataset. Since we have 569 observations in the original dataset, they would be too much for a clear dendrogram. Therefore, we randomly selected 20 malignant diagnosis and 20 benign diagnosis from the data to form our dataset for the cluster analysis. We want to keep the percentage of each diagnosis the same to produce generalizable results.
+
+
+And addition to transforming the variables as I did for PCA above (using square root transformation), we standardized them. If we examine the descriptive statistics presented in Table 1, we can see that some of the variables have a wider range of values than the other variables; and variables like radius mean and texture mean generally are 10 fold larger than the rest of the variables. Therefore, standardizing all 10 variables ensures that this won’t be a problem for the analysis below.
+
+
+We generated two dendrograms that plot groups of observations from our population. Conceptually, the goal of this analysis is to determine how many groups of observations there are based on sizes and texture variables. This would give me a better idea of how different (or similar) various tumors are in terms of diagnosis and descriptive characteristics.
+
+
+**Figure 9: Dentrogram using Euclidean and Complete Linkage**
+
+```{r echo=FALSE, warning=FALSE}
+# (1) Euclidean and Complete Linkage
+# Get distance matrix
+Uninorm.B<-Breast_Cancer_3[Breast_Cancer_3$diagnosis=="B", ]
+Uninorm.M<-Breast_Cancer_3[Breast_Cancer_3$diagnosis=="M", ]
+Uninorm.new<-rbind.data.frame(Uninorm.B[170:190,],Uninorm.M[70:90,])
+
+dist1 <- dist(Uninorm.new, method = "euclidean")
+# Perform cluster analysis
+clust1 <- hclust(dist1, method = "complete")
+
+# Make dendrogram
+clust1$labels <- as.character(Uninorm.new[,1])
+plot(clust1, xlab = "",ylab = "Distance", main = "Clustering for Breast Cancer")
+# identify two groups
+rect.hclust(clust1, k = 3)
+```
+
+We tried Euclidean and Complete Linkage method. This method calculates the distance between two clusters as the Euclidean distance between their centroids,and measures the distance based on the maximum distance between any two points in each cluster. The cluster results showed that there are three main groups. One group consists of "M", one group consists of "B", and one group is combined with "M" and "B".  This makes sense since tumors can be malignant, benign, or pre-malignant. 
+
+
+**Figure 10: Dendrogram using Ward Distance (agglomeration method) paired with Minkowski**
+
+
+```{r echo=FALSE}
+# (2) Minkowski and Ward.D
+# Get distance matrix
+dist3 <- dist(Uninorm.new[,-1], method = "minkowski")
+# Perform cluster analysis
+clust3 <- hclust(dist3, method = "ward.D")
+# Make dendrogram
+plot(clust3, labels = Uninorm.new[,1], cex = 0.6, xlab = "",
+ylab = "Distance", main = "Breast Cancer")
+# identify two groups
+rect.hclust(clust3, k = 3)
+```
+
+Next we tried Ward Distance (agglomeration method) paired with Minkowski (distance metrics). This method is a hierarchical clustering technique that calculates the distance between two clusters using the Minkowski distance metric raised to a power. The cluster results also showed that there are three main groups. One group mostly consists of "M", one group mostly consists of "B", and one group is combined with "M" and "B".  
+
+From the dendrograms, we can find that employing distance method Euclidean + agglomeration method
+Complete Linkage shows similar results as distance method Minkowski + agglomeration method Ward’s
+method. Both of them categorizes the tumors to three large groups including malignant group, benign group, and the pre-malignant group. This corresponds highly to related literature and is useful for future analysis.
+
+
+
+## Section 3: Discriminant Analysis
+
+In this section, we tested which of the 10 continuous variables would be best used to discriminant the cancer diagnosis between benign and malignant. Backward step wise Discriminant analysis were used to do the first round of variable selection while we continued to do quadratic and linear discriminant data analysis to furthur select the variables. This analysis would be beneficial for the biological and mathematical fields because it would help identify what characteristics could be used to identify the tumors to be malignant and give the patients longer time for treatments.
+
+Firstly we plotted histograms of each of the 10 continuous independent variables with regard to diagnosis to see whether or not there are differences for those variables for the two groups.
+
+**Figure 11: Differences in characteristics for Benign and Malignant Tumors**
+
+```{r echo=FALSE}
+#Boxplots of variables
+par(mfrow=c(2, 5))
+boxplot(radius_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Radius")
+boxplot(texture_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Texture ")
+boxplot(perimeter_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Perimeter")
+boxplot(area_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Area")
+boxplot(smoothness_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Smoothness")
+boxplot(compactness_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Compactness")
+boxplot(concavity_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Concavity")
+boxplot(concave.points_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Concave.points")
+boxplot(symmetry_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Symmetry")
+boxplot(fractal_dimension_mean ~ diagnosis, data=Breast_Cancer_3, col = c("blue","red"), main = "Fractal")
+```
+
+
+From the boxplots, we can see that there are visible differences between malignant and benign diagnosis for most of the variables, except for variables symmetry and fractal dimension. The median of symmetry and fractal dimension for malignant and benign diagnosis are similar. However, those variables may help discriminant tumors when working together. Therefore, we proceed with our analysis to the next step of drawing chi-square quantile plots for Malignant and Benign disgnosis seperately.
+
+
+**Figure 12-13: Chi-Square Quantile Plots for Benign and Malignant Diagnosis**
+
+
+```{r echo=FALSE}
+source("http://www.reuningscherer.net/multivariate/R/CSQPlot.r.txt")
+Breast_variables = c("radius_mean", "perimeter_mean", "texture_mean", "area_mean", "smoothness_mean","compactness_mean", "concavity_mean", "concave.points_mean")
+CSQPlot(Breast_Cancer_3[Breast_Cancer_3$diagnosis == "M", Breast_variables], label = "Malignant")
+CSQPlot(Breast_Cancer_3[Breast_Cancer_3$diagnosis == "B", Breast_variables], label = "Benign")
+```
+
+From the Chi-Square quantile plots, we can see that there are some outliers that are outside the 95% Confidence interval band for the normal quantiles. However, most of our data for both benign and malignant disgnosis fall into the 95% CI band and adhere to the normal quantiles mostly. There are only 5 extreme outliers in both plots that deviates from the chi-square quantile plots a lot so we may continue with our analysis and say that our response variables are mostly assumed to be multivariate normal.
+
+**Table 6: Multivariate Wilk's Lambda Test Results**
+
+| F Statistic | degree of freedom | p-value    |
+|-------------|-------------------|------------|
+| 127.28      | 10                | \< 2.2e-16 |
+
+
+```{r include=FALSE}
+#get univarite and multivariate comparisons
+BC.manova <- manova(as.matrix(Breast_Cancer_3[, c(2:11)]) ~ Breast_Cancer_3$diagnosis)
+summary.manova(BC.manova, test = "Wilks")
+```
+
+We used Wilk’s Lambda test for checking whether the group means are different. Wilks lambda is 0.30478, and the p-value is < 2.2e-16, indicating that we have confident evidence to reject the null hypothesis. Therefore, there is statistical evidence that the multivariate group means are different.
+
+
+```{r include=FALSE}
+#Tests
+boxM(Breast_Cancer_3[,c("radius_mean", "perimeter_mean", "texture_mean", "area_mean", "smoothness_mean","compactness_mean", "concavity_mean", "concave.points_mean")], Breast_Cancer_3$diagnosis)
+```
+
+**Table 7: Box's M-test for Homogeneity of Covariance Matrices**
+
+| Chi-Square Statistic | degree of freedom  | p-value    |
+|----------------------|--------------------|------------|
+| 1345.8               | 36                 |  < 2.2e-16 |
+
+
+We conducted the Box’s M test and it gives a small p-value less than 0.05, which means we reject the null hypothesis and conclude that there is significant difference between the different groups' covariance matrices. 
+
+Since the covariance assumption is not met, we are going to use both linear discriminant analysis and quadratic discriminant analysis for our data.
+
+
+**Step-wise Quadratic and Linear Backward Discriminant Analysis**
+
+We firstly conducted the backward step-wise discriminant analysis using both quadratic and linear methods. The linear step-wise DA was not informational because it started with 10 variables and ended with 9 variables, only excluding the variable "smoothness", and has a 0.95254 correctness rate.
+
+The quadratic step-wise DA was informational because it started with 10 variables and ended with 5 variables, excluding "compactness", "concave.points","radius", "symmetry", and "fractal dimension". And the resulted correctness rate is 0.95432. 
+
+Since the quadratic step-wise DA was more informational for which more redundant variables were removed from the analysis and still having high correctness rate, we decided to use the result of quadratic stepwise analysis. As the result, we have variables "texture", "area", "smoothness", "concavity", and "symmetry" left in the model.
+
+
+```{r include=FALSE}
+Breast_Cancer_3$diagnosis <- as.factor(Breast_Cancer_3$diagnosis)
+step1 <- stepclass(diagnosis ~ radius_mean + texture_mean + perimeter_mean + area_mean + smoothness_mean+compactness_mean+concavity_mean+concave.points_mean+symmetry_mean + fractal_dimension_mean, data = Breast_Cancer_3, method = "lda", direction = "backward")
+step1$result.pm
+
+step2 <- stepclass(diagnosis ~ radius_mean + texture_mean + perimeter_mean + area_mean + smoothness_mean+compactness_mean+concavity_mean+concave.points_mean+symmetry_mean + fractal_dimension_mean, data = Breast_Cancer_3, method = "qda", direction = "backward")
+```
+
+
+For the next step, we conducted Linear Discriminant Analysis and Quadratic Discriminant Analysis separately using the 5 variables chosen from the step-wise discriminant Analysis. For the prior probabilities used in the model, we used the default 0.62741 for benign and 0.37258 for malignant diagnosis based on our data distribution. We used the raw results from linear and quadratic DA as well as the cross-validated results to compare between them. 
+
+
+
+```{r include=FALSE}
+#Linear Discriminant Analysis
+BC.disc <- lda(Breast_Cancer_3[, c(3,5,6,8,10)], grouping = Breast_Cancer_3$diagnosis)
+names(BC.disc)
+BC.disc
+print("Normalized Coefficients")
+round(BC.disc$scaling/sqrt(sum(BC.disc$scaling^2)),2)
+```
+
+```{r include=FALSE}
+#Raw Results
+CBC.disc <- table(Breast_Cancer_3$diagnosis, predict(BC.disc)$class)
+round(sum(diag(prop.table(CBC.disc))), 2)
+
+#cross validated results
+BC.discCV <- lda(Breast_Cancer_3[, c(3,5,6,8,10)], grouping = Breast_Cancer_3$diagnosis, CV = TRUE)
+ctCV <- table(Breast_Cancer_3$diagnosis, BC.discCV$class)
+summary(BC.discCV)
+
+# total percent correct
+round(sum(diag(prop.table(ctCV))),2)
+```
+
+
+```{r include=FALSE}
+BCQ.disc <- qda(Breast_Cancer_3[,c(3,5,6,8,10)], grouping = Breast_Cancer_3$diagnosis)
+BCQ.disc
+# raw results - more accurate than using linear DA
+BCQ <- table(Breast_Cancer_3$diagnosis, predict(BCQ.disc)$class)
+BCQ
+# total percent correct
+round(sum(diag(prop.table(BCQ))),2)
+```
+
+
+```{r include=FALSE}
+#Cross Validated Results
+BC.discCVQ <- qda(Breast_Cancer_3[,c(3,5,6,8,10)], grouping = Breast_Cancer_3$diagnosis, CV = TRUE)
+BCCVQ <- table(Breast_Cancer_3$diagnosis, BC.discCVQ$class)
+BCCVQ
+round(sum(diag(prop.table(BCCVQ))),2)
+```
+
+
+
+From the results, the raw correctness rate for LDA was 0.96 and the correctness rate after cross validation for LDA was 0.95. The raw correctness rate for QDA was 0.94 and the correctness rate after cross validation for QDA was 0.93. Since the percentage correct for LDA is higher than the percentage correct for QDA, we decide to use the result from our linear discriminant analysis to continue with our research.
+
+**Figure 14: Forbs Discriminant Scores after Linear Discriminant Analysis**
+
+
+```{r echo=FALSE}
+#get the scores - matrix product of original variables with DA coefficients
+BC.disc2 <- lda(Breast_Cancer_3[, c(3,5,6,8,10)], grouping = Breast_Cancer_3$diagnosis)
+scores <- as.matrix(Breast_Cancer_3[, c(3,5,6,8,10)]) %*% BC.disc2$scaling
+
+boxplot(scores ~ Breast_Cancer_3$diagnosis, lwd = 3, col = c("red","blue"), horizontal = T, main = "Forbs Discriminant Scores by Function", ylab = "Function")
+```
+
+From the figure above, we can see that the forbs discriminant scores for the two diagnosis are separated well with the mean and medians for malignant diagnosis far away from the benign diagnosis. Which indicates our LDA has good results.
+
+
+**Table 9: Coefficients of Linear Discriminant**
+
+
+| Variable          | LD1 Coefficients | Normalized LD1 Coefficients |
+|-------------------|------------------|-----------------------------|
+| texture_mean      | 0.093            | 0.00                        |
+| perimeter_mean    | 0.041            | 0.00                        |
+| smoothness_mean   | 22.039           | 0.91                        |
+| compactness_mean  | -4.804           | -0.20                       |
+| concavity_mean    | 5.906            | 0.24                        |
+| symmetry_mean     | 6.258            | 0.26                        |
+
+We can see that looking at the normalized LD1 coefficients, smoothness, compactness, concavity, and symmetry has coefficients with relatively high absolute values. Therefore, we think those variables would contribute more to the discrimination between malignant and benign tumors. Which makes sense because current diagnosis of breast cancer and tumors include smoothness as a large part of the decision as can be shown in the literature.
+
+
+Next we decide to look at the partition plots for both LDA and QDA models to see which interpretation works better.
+
+
+**Figure 15: Partition Plot for LDA Results**
+
+```{r echo=FALSE}
+Breast_Cancer_3$diagnosis <- as.factor(Breast_Cancer_3$diagnosis)
+partimat(Breast_Cancer_3$diagnosis ~ smoothness_mean+compactness_mean+concavity_mean+symmetry_mean + texture_mean + perimeter_mean, data = Breast_Cancer_3, method = "lda")
+```
+
+**Figure 16: Partition Plot for QDA Results**
+
+```{r echo=FALSE}
+partimat(Breast_Cancer_3$diagnosis ~ smoothness_mean+compactness_mean+concavity_mean+symmetry_mean + texture_mean + perimeter_mean, data = Breast_Cancer_3, method = "qda")
+```
+
+
+When comparing the QDA and LDA results, we feel like the separation of the tumor diagnosis of benign and malignant is clear with out too many complications, and the red observations in the LDA results graph seems to be less than the wronged classified observations in the QDA plot. Therefore, this reassures our decision to use the linear discriminant analysis results for our final solution.
+
+We can then take a closer look to the partition plot of our LDA results, and we can see that the plots with the texture and perimeter as variables tend to lead to a partition plot with more red observations, which means increased error rate. And this result coincide with our findings from the normalized coefficients in which perimeter and texture have really low coefficients leading to less impact on discriminating tumors.
+
+
+**Figure 17: Partition Plot for updated LDA Results**
+
+```{r echo=FALSE}
+Breast_Cancer_3$diagnosis <- as.factor(Breast_Cancer_3$diagnosis)
+partimat(Breast_Cancer_3$diagnosis ~ smoothness_mean+compactness_mean+concavity_mean+symmetry_mean, data = Breast_Cancer_3, method = "lda")
+```
+
+
+We plotted the partition LDA plot after removing the variables texture and perimeter. And the malignant and benign tumors look clearly separated in the partition plot with only a few errors.
+
+Therefore, our discriminant analysis results show that Smoothness, Compactness, Concavity, and Symmetry would be the characteristic variables that would best discriminate between malignant and benign tumors.
+
+
